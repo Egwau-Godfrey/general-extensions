@@ -1,8 +1,8 @@
 import { ContentRating, SourceInfo, SourceIntents } from "@paperback/types";
 
 export default {
-    name: "Bato",
-    description: "Extension that pulls content from Bato.to",
+    name: "Bato.To",
+    description: "Extension that pulls content from bato.to.",
     version: "1.0.0-alpha.1",
     icon: "icon.png",
     language: "en",

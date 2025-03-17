@@ -1,4 +1,4 @@
-declare namespace Bato {
+declare namespace BatoTo {
     type Metadata = { offset?: number; collectedIds?: string[] };
 
     interface Result {

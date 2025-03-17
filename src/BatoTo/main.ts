@@ -1,9 +1,3 @@
-// TODO:
-// - Add the English name to the title view
-// - Add additional info to the title view
-// - Make getChapterDetails only return new chapters
-// - Fix exclude search
-
 import {
     BasicRateLimiter,
     Chapter,
@@ -30,18 +24,17 @@ import {
     SourceManga,
     TagSection,
 } from "@paperback/types";
-// Extension settings file
 import * as cheerio from "cheerio";
 import { CheerioAPI } from "cheerio";
 import { URLBuilder } from "../utils/url-builder/base";
 import { genreOptions } from "./genreOptions";
 import { genres } from "./genres";
-import { BatoSettingsForm, getLanguages } from "./SettingsForm";
+import { BatoToSettingsForm, getLanguages } from "./SettingsForm";
 
 const DOMAIN_NAME = "https://bato.to";
 
 // Should match the capabilities which you defined in pbconfig.ts
-type BatoImplementation = SettingsFormProviding &
+type BatoToImplementation = SettingsFormProviding &
     Extension &
     DiscoverSectionProviding &
     SearchResultsProviding &
@@ -77,7 +70,7 @@ class MainInterceptor extends PaperbackInterceptor {
 }
 
 // Main extension class
-export class BatoExtension implements BatoImplementation {
+export class BatoToExtension implements BatoToImplementation {
     // Implementation of the main rate limiter
     mainRateLimiter = new BasicRateLimiter("main", {
         numberOfRequests: 15,
@@ -96,7 +89,7 @@ export class BatoExtension implements BatoImplementation {
 
     // Implements the settings form, check SettingsForm.ts for more info
     async getSettingsForm(): Promise<Form> {
-        return new BatoSettingsForm();
+        return new BatoToSettingsForm();
     }
 
     async getDiscoverSections(): Promise<DiscoverSection[]> {
@@ -135,7 +128,7 @@ export class BatoExtension implements BatoImplementation {
     // Populates both the discover sections
     async getDiscoverSectionItems(
         section: DiscoverSection,
-        metadata: Bato.Metadata | undefined,
+        metadata: BatoTo.Metadata | undefined,
     ): Promise<PagedResults<DiscoverSectionItem>> {
         switch (section.id) {
             case "popular-updates":
@@ -848,4 +841,4 @@ function createDiscoverSectionItem(options: {
     };
 }
 
-export const Batoto = new BatoExtension();
+export const BatoTo = new BatoToExtension();
