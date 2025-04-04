@@ -34,7 +34,7 @@ export class WebtoonExtention
     getMangaDetails(mangaId: string): Promise<SourceManga> {
         return this.ExecRequest(
             {
-                url: `${this.BASE_URL}/${this.parseIdToSource(mangaId)}`,
+                url: `${this.BASE_URL}/${mangaId}`,
             },
             ($) => this.parseDetails($, mangaId),
         );
@@ -43,7 +43,7 @@ export class WebtoonExtention
     getChapters(sourceManga: SourceManga): Promise<Chapter[]> {
         return this.ExecRequest(
             {
-                url: `${this.MOBILE_URL}/${this.parseIdToSource(sourceManga.mangaId)}`,
+                url: `${this.MOBILE_URL}/${sourceManga.mangaId}`,
                 headers: { referer: this.MOBILE_URL },
             },
             ($) => this.parseChaptersList($, sourceManga),
@@ -53,7 +53,7 @@ export class WebtoonExtention
     getChapterDetails(chapter: Chapter): Promise<ChapterDetails> {
         return this.ExecRequest(
             {
-                url: `${this.BASE_URL}/${this.parseIdToSource(chapter.chapterId)}`,
+                url: `${this.BASE_URL}/${chapter.chapterId}`,
             },
             ($) => this.parseChapterDetails($, chapter),
         );
@@ -209,9 +209,6 @@ export class WebtoonExtention
         const [languagestr, sectionId] = section.id.split("-_-");
         const language = languagestr as Language;
 
-        console.log(
-            `get discover section items: ${section.id} ${language} ${sectionId}`,
-        );
         switch (sectionId) {
             case "popular":
                 result = await this.getPopularTitles(language);
@@ -247,7 +244,6 @@ export class WebtoonExtention
         this.languages.forEach((language) => {
             result.push(...this.getLanguageDiscoverSections(language));
         });
-        console.log("result " + JSON.stringify(result));
         return Promise.resolve(result);
     }
 

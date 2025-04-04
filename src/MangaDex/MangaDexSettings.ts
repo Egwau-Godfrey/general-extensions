@@ -1,16 +1,128 @@
 import {
     ButtonRow,
-    DeferredItem,
     Form,
-    LabelRow,
     NavigationRow,
     OAuthButtonRow,
     Section,
-    SelectRow,
-    ToggleRow,
 } from "@paperback/types";
+import { ContentSettingsForm } from "./forms/ContentSettingsForm";
+import { DiscoverSettingsForm } from "./forms/DiscoverSettingsForm";
+import { GroupBlockForm } from "./forms/GroupBlockForm";
+import { LibraryMangaListForm } from "./forms/LibraryMangaListForm";
+import { SearchSettingsForm } from "./forms/SearchSettingsForm";
+import { SessionInfoForm } from "./forms/SessionInfoForm";
+import { TrackingSettingsForm } from "./forms/TrackingSettingsForm";
+import { UpdateFilterSettingsForm } from "./forms/UpdateFilterSettingsForm";
+import { WebsiteSettingsForm } from "./forms/WebsiteSettingsForm";
+import { WebsiteStatusForm } from "./forms/WebsiteStatusForm";
 import { MDImageQuality, MDLanguages, MDRatings } from "./MangaDexHelper";
+import { MangaProvider } from "./providers/MangaProvider";
+import { State } from "./utils/StateUtil";
 
+// ============================
+// Constants & Definitions
+// ============================
+export const DISCOVER_SECTIONS = {
+    SEASONAL: "seasonal",
+    LATEST_UPDATES: "latest_updates",
+    POPULAR: "popular",
+    RECENTLY_ADDED: "recently_Added",
+    TAG_SECTIONS: "tag_sections",
+};
+
+export const DEFAULT_SECTION_ORDER = [
+    DISCOVER_SECTIONS.SEASONAL,
+    DISCOVER_SECTIONS.LATEST_UPDATES,
+    DISCOVER_SECTIONS.POPULAR,
+    DISCOVER_SECTIONS.RECENTLY_ADDED,
+    DISCOVER_SECTIONS.TAG_SECTIONS,
+];
+
+// ============================
+// Discover Section Settings
+// ============================
+export function getDiscoverSectionOrder(): string[] {
+    const savedOrder = Application.getState("discover_section_order") as
+        | string[]
+        | undefined;
+    if (
+        !savedOrder ||
+        !Array.isArray(savedOrder) ||
+        savedOrder.length < 5 ||
+        !savedOrder.includes(DISCOVER_SECTIONS.SEASONAL) ||
+        !savedOrder.includes(DISCOVER_SECTIONS.LATEST_UPDATES) ||
+        !savedOrder.includes(DISCOVER_SECTIONS.POPULAR) ||
+        !savedOrder.includes(DISCOVER_SECTIONS.RECENTLY_ADDED) ||
+        !savedOrder.includes(DISCOVER_SECTIONS.TAG_SECTIONS)
+    ) {
+        return DEFAULT_SECTION_ORDER;
+    }
+    return savedOrder;
+}
+
+export function setDiscoverSectionOrder(order: string[]): void {
+    Application.setState(order, "discover_section_order");
+}
+
+export function getSeasonalEnabled(): boolean {
+    return (
+        (Application.getState("seasonal_enabled") as boolean | undefined) ??
+        true
+    );
+}
+
+export function setSeasonalEnabled(enabled: boolean): void {
+    Application.setState(enabled, "seasonal_enabled");
+}
+
+export function getLatestUpdatesEnabled(): boolean {
+    return (
+        (Application.getState("latest_updates_enabled") as
+            | boolean
+            | undefined) ?? true
+    );
+}
+
+export function setLatestUpdatesEnabled(enabled: boolean): void {
+    Application.setState(enabled, "latest_updates_enabled");
+}
+
+export function getPopularEnabled(): boolean {
+    return (
+        (Application.getState("popular_enabled") as boolean | undefined) ?? true
+    );
+}
+
+export function setPopularEnabled(enabled: boolean): void {
+    Application.setState(enabled, "popular_enabled");
+}
+
+export function getRecentlyAddedEnabled(): boolean {
+    return (
+        (Application.getState("recently_added_enabled") as
+            | boolean
+            | undefined) ?? true
+    );
+}
+
+export function setRecentlyAddedEnabled(enabled: boolean): void {
+    Application.setState(enabled, "recently_added_enabled");
+}
+
+export function getTagSectionsEnabled(): boolean {
+    return (
+        (Application.getState("tag_sections_enabled") as boolean | undefined) ??
+        true
+    );
+}
+
+export function setTagSectionsEnabled(enabled: boolean): void {
+    Application.setState(enabled, "tag_sections_enabled");
+}
+
+// ============================
+// Content Settings
+// ============================
 export function getLanguages(): string[] {
     return (
         (Application.getState("languages") as string[] | undefined) ??
@@ -29,6 +141,12 @@ export function getDataSaver(): boolean {
     return (Application.getState("data_saver") as boolean | undefined) ?? false;
 }
 
+export function getForcePort443(): boolean {
+    return (
+        (Application.getState("force_port_443") as boolean | undefined) ?? false
+    );
+}
+
 export function getSkipSameChapter(): boolean {
     return (
         (Application.getState("skip_same_chapter") as boolean | undefined) ??
@@ -36,33 +154,31 @@ export function getSkipSameChapter(): boolean {
     );
 }
 
-export function getForcePort443(): boolean {
+export function getUpdateBatchSize(): number {
     return (
-        (Application.getState("force_port_443") as boolean | undefined) ?? false
+        (Application.getState("update_batch_size") as number | undefined) ?? 100
     );
 }
 
-export function getHomepageThumbnail(): string {
+export function setUpdateBatchSize(size: number): void {
+    Application.setState(size, "update_batch_size");
+}
+
+export function getCustomCoversEnabled(): boolean {
     return (
-        (Application.getState("homepage_thumbnail") as string | undefined) ??
-        MDImageQuality.getDefault("homepage")
+        (Application.getState("custom_covers_enabled") as
+            | boolean
+            | undefined) ?? false
     );
 }
 
-export function getSearchThumbnail(): string {
-    return (
-        (Application.getState("search_thumbnail") as string | undefined) ??
-        MDImageQuality.getDefault("search")
-    );
+export function setCustomCoversEnabled(enabled: boolean): void {
+    Application.setState(enabled, "custom_covers_enabled");
 }
 
-export function getMangaThumbnail(): string {
-    return (
-        (Application.getState("manga_thumbnail") as string | undefined) ??
-        MDImageQuality.getDefault("manga")
-    );
-}
-
+// ============================
+// Authentication & User Settings
+// ============================
 export function getAccessToken(): MangaDex.AccessToken | undefined {
     const accessToken = Application.getSecureState("access_token") as
         | string
@@ -107,16 +223,19 @@ function parseAccessToken(accessToken: string): MangaDex.TokenBody {
 }
 
 async function _authEndpointRequest(
-    endpoint: "login" | "refresh" | "logout",
-    payload: string | undefined,
-): Promise<MangaDex.AuthResponse | MangaDex.AuthError> {
+    payload: string,
+): Promise<MangaDex.AuthResponse> {
     const [response, buffer] = await Application.scheduleRequest({
         method: "POST",
-        url: `https://auth.mangadex.org/auth/${endpoint}`,
+        url: `https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token`,
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: payload,
+        body: {
+            refresh_token: payload,
+            client_id: "paperback",
+            grant_type: "refresh_token",
+        },
     });
 
     if (response.status > 399) {
@@ -124,44 +243,332 @@ async function _authEndpointRequest(
     }
 
     const data = Application.arrayBufferToUTF8String(buffer);
-    const jsonData = JSON.parse(data) as
-        | MangaDex.AuthResponse
-        | MangaDex.AuthError;
+    const json = JSON.parse(data) as MangaDex.AuthResponse | MangaDex.AuthError;
 
-    if (jsonData.result === "error") {
+    if ("error" in json) {
         throw new Error(
-            "Auth failed: " +
-                (jsonData as MangaDex.AuthError).errors
-                    .map((x) => `[${x.title}]: ${x.detail}`)
-                    .join(", "),
+            `Auth failed: ${json.error}: ${json.error_description || ""}`,
         );
     }
 
-    return jsonData;
+    return json;
 }
 
-const authRequestCache: Record<
-    string,
-    Promise<MangaDex.AuthResponse | MangaDex.AuthError>
-> = {};
+const authRequestCache: Record<string, Promise<MangaDex.AuthResponse>> = {};
 
 export function authEndpointRequest(
-    endpoint: "login" | "refresh" | "logout",
-    payload: string | undefined,
+    payload: string,
 ): Promise<MangaDex.AuthResponse> {
-    if (!(endpoint in authRequestCache)) {
-        authRequestCache[endpoint] = _authEndpointRequest(
-            endpoint,
-            payload,
-        ).finally(() => {
-            delete authRequestCache[endpoint];
-        });
+    const cacheKey = payload;
+    if (!(cacheKey in authRequestCache)) {
+        authRequestCache[cacheKey] = _authEndpointRequest(payload).finally(
+            () => {
+                delete authRequestCache[cacheKey];
+            },
+        );
     }
-    return authRequestCache[endpoint] as Promise<MangaDex.AuthResponse>;
+    return authRequestCache[cacheKey];
 }
 
+// ============================
+// Display Settings
+// ============================
+export function getDiscoverThumbnail(): string {
+    return (
+        (Application.getState("discover_thumbnail") as string | undefined) ??
+        MDImageQuality.getDefault("discover")
+    );
+}
+
+export function getSearchThumbnail(): string {
+    return (
+        (Application.getState("search_thumbnail") as string | undefined) ??
+        MDImageQuality.getDefault("search")
+    );
+}
+
+export function getMangaThumbnail(): string {
+    return (
+        (Application.getState("manga_thumbnail") as string | undefined) ??
+        MDImageQuality.getDefault("manga")
+    );
+}
+
+export function getShowStatusIcons(): boolean {
+    return (
+        (Application.getState("show_status_icons") as boolean | undefined) ??
+        false
+    );
+}
+
+export function setShowStatusIcons(enabled: boolean): void {
+    Application.setState(enabled, "show_status_icons");
+}
+
+export function getShowRatingIcons(): boolean {
+    return (
+        (Application.getState("show_content_rating_icons") as
+            | boolean
+            | undefined) ?? false
+    );
+}
+
+export function setShowRatingIcons(enabled: boolean): void {
+    Application.setState(enabled, "show_content_rating_icons");
+}
+
+export function getShowVolume(): boolean {
+    return (
+        (Application.getState("show_volume_in_subtitle") as
+            | boolean
+            | undefined) ?? true
+    );
+}
+
+export function setShowVolume(enabled: boolean): void {
+    Application.setState(enabled, "show_volume_in_subtitle");
+}
+
+export function getShowChapter(): boolean {
+    return (
+        (Application.getState("show_chapter_in_subtitle") as
+            | boolean
+            | undefined) ?? true
+    );
+}
+
+export function setShowChapter(enabled: boolean): void {
+    Application.setState(enabled, "show_chapter_in_subtitle");
+}
+
+// ============================
+// Group Blocking Settings
+// ============================
+export function getBlockedGroups(): Record<
+    string,
+    MangaDex.ScanlationGroupItem
+> {
+    return (
+        (Application.getState("blocked_groups") as
+            | Record<string, MangaDex.ScanlationGroupItem>
+            | undefined) ?? {}
+    );
+}
+
+export function saveBlockedGroups(
+    groups: Record<string, MangaDex.ScanlationGroupItem>,
+): void {
+    Application.setState(groups, "blocked_groups");
+}
+
+export function blockGroup(group: MangaDex.ScanlationGroupItem): void {
+    const blockedGroups = getBlockedGroups();
+    blockedGroups[group.id] = group;
+    saveBlockedGroups(blockedGroups);
+}
+
+export function unblockGroup(groupId: string): void {
+    const blockedGroups = getBlockedGroups();
+    delete blockedGroups[groupId];
+    saveBlockedGroups(blockedGroups);
+}
+
+export function getGroupBlockingEnabled(): boolean {
+    return (
+        (Application.getState("group_blocking_enabled") as
+            | boolean
+            | undefined) ?? false
+    );
+}
+
+export function setGroupBlockingEnabled(enabled: boolean): void {
+    Application.setState(enabled, "group_blocking_enabled");
+}
+
+export function getFuzzyBlockingEnabled(): boolean {
+    return (
+        (Application.getState("fuzzy_blocking_enabled") as
+            | boolean
+            | undefined) ?? false
+    );
+}
+
+export function setFuzzyBlockingEnabled(enabled: boolean): void {
+    Application.setState(enabled, "fuzzy_blocking_enabled");
+}
+
+// ============================
+// Update & Tracking Settings
+// ============================
+export function getOptimizeUpdates(): boolean {
+    return (
+        (Application.getState("optimize_updates") as boolean | undefined) ??
+        true
+    );
+}
+
+export function setOptimizeUpdates(enabled: boolean): void {
+    Application.setState(enabled, "optimize_updates");
+}
+
+export function getMetadataUpdater(): boolean {
+    return (
+        (Application.getState("metadata_updater") as boolean | undefined) ??
+        false
+    );
+}
+
+export function setMetadataUpdater(enabled: boolean): void {
+    Application.setState(enabled, "metadata_updater");
+}
+
+export function getSkipPublicationStatus(): string[] {
+    return (
+        (Application.getState("skip_publication_status") as
+            | string[]
+            | undefined) ?? []
+    );
+}
+
+export function setSkipPublicationStatus(status: string[]): void {
+    Application.setState(status, "skip_publication_status");
+}
+
+export function getSkipNewChapters(): number {
+    const value = Application.getState("skip_new_chapters");
+    return typeof value === "number" ? value : 0;
+}
+
+export function setSkipNewChapters(chapterAmount: number): void {
+    Application.setState(chapterAmount, "skip_new_chapters");
+}
+
+export function getSkipUnreadChapters(): number {
+    const value = Application.getState("skip_unread_chapters");
+    return typeof value === "number" ? value : 0;
+}
+
+export function setSkipUnreadChapters(chapterAmount: number): void {
+    Application.setState(chapterAmount, "skip_unread_chapters");
+}
+
+export function getTrackingEnabled(): boolean {
+    return (
+        (Application.getState("tracking_enabled") as boolean | undefined) ??
+        false
+    );
+}
+
+export function setTrackingEnabled(enabled: boolean): void {
+    Application.setState(enabled, "tracking_enabled");
+}
+
+export function getMangaProgressEnabled(): boolean {
+    return (
+        (Application.getState("manga_progress_enabled") as
+            | boolean
+            | undefined) ?? false
+    );
+}
+
+export function setMangaProgressEnabled(enabled: boolean): void {
+    Application.setState(enabled, "manga_progress_enabled");
+}
+
+export function getTrackingContentRatings(): string[] {
+    return (
+        (Application.getState("tracking_content_ratings") as
+            | string[]
+            | undefined) ?? MDRatings.getDefault()
+    );
+}
+
+export function setTrackingContentRatings(ratings: string[]): void {
+    Application.setState(ratings, "tracking_content_ratings");
+}
+
+// ============================
+// Search Settings
+// ============================
+export function getSearchSortOrder(): string {
+    return (
+        (Application.getState("search_sort_order") as string | undefined) ?? ""
+    );
+}
+
+export function setSearchSortOrder(order: string): void {
+    Application.setState(order, "search_sort_order");
+}
+
+export function getRelevanceScoringEnabled(): boolean {
+    return (
+        (Application.getState("relevance_scoring_enabled") as
+            | boolean
+            | undefined) ?? true
+    );
+}
+
+export function setRelevanceScoringEnabled(enabled: boolean): void {
+    Application.setState(enabled, "relevance_scoring_enabled");
+}
+
+export function getChapterPreloadingEnabled(): boolean {
+    return (
+        (Application.getState("chapter_preloading_enabled") as
+            | boolean
+            | undefined) ?? false
+    );
+}
+
+export function setChapterPreloadingEnabled(enabled: boolean): void {
+    Application.setState(enabled, "chapter_preloading_enabled");
+}
+
+// ============================
+// Cover Selection Settings
+// ============================
+export interface CustomCoverInfo {
+    id: string;
+    fileName: string;
+}
+
+export function getSelectedCover(mangaId: string): CustomCoverInfo | undefined {
+    const covers = Application.getState("selected_covers") as
+        | Record<string, CustomCoverInfo>
+        | undefined;
+    return covers?.[mangaId];
+}
+
+export function setSelectedCover(
+    mangaId: string,
+    coverId: string,
+    fileName: string,
+): void {
+    const covers =
+        (Application.getState("selected_covers") as Record<
+            string,
+            CustomCoverInfo
+        >) || {};
+    covers[mangaId] = { id: coverId, fileName: fileName };
+    Application.setState(covers, "selected_covers");
+}
+
+export function removeSelectedCover(mangaId: string): void {
+    const covers =
+        (Application.getState("selected_covers") as Record<
+            string,
+            CustomCoverInfo
+        >) || {};
+    if (covers[mangaId]) {
+        delete covers[mangaId];
+        Application.setState(covers, "selected_covers");
+    }
+}
+
+// ============================
+// Settings Form Class
+// ============================
 export class MangaDexSettingsForm extends Form {
-    // State management for all form fields
     private languagesState = new State<string[]>(
         this,
         "languages",
@@ -189,11 +596,10 @@ export class MangaDexSettingsForm extends Form {
         !!getAccessToken(),
     );
 
-    // Add thumbnail states
-    private homepageThumbState = new State<string>(
+    private discoverThumbState = new State<string>(
         this,
-        "homepage_thumbnail",
-        getHomepageThumbnail(),
+        "discover_thumbnail",
+        getDiscoverThumbnail(),
     );
     private searchThumbState = new State<string>(
         this,
@@ -206,113 +612,113 @@ export class MangaDexSettingsForm extends Form {
         getMangaThumbnail(),
     );
 
-    // Add reset state
     private resetState = new State<boolean>(this, "reset_trigger", false);
 
-    override getSections(): Application.FormSectionElement[] {
-        return [
-            this.createOAuthSection(),
-            this.createContentSettingsSection(),
-            this.createThumbnailSettingsSection(),
-            this.createResetSection(),
-        ];
+    private blockedGroupsState = new State<
+        Record<string, MangaDex.ScanlationGroupItem>
+    >(this, "blocked_groups", getBlockedGroups());
+
+    public getOAuthState(): {
+        value: boolean;
+        updateValue: (value: boolean) => Promise<void>;
+    } {
+        return this.oAuthState;
     }
 
-    private createOAuthSection(): Application.FormSectionElement {
-        return Section("oAuthSection", [
-            DeferredItem(() => {
-                if (this.oAuthState.value) {
-                    return NavigationRow("sessionInfo", {
-                        title: "Session Info",
-                        form: this.createSessionInfoForm(),
-                    }) as Application.FormItemElement<unknown>;
-                }
-                return this.createLoginButton();
+    override getSections(): Application.FormSectionElement[] {
+        const sections = [this.createMainSettingsSection()];
+
+        if (this.oAuthState.value) {
+            sections.push(
+                Section("librarySection", [
+                    NavigationRow("library_manga", {
+                        title: "My Library",
+                        subtitle: "View and manage your MangaDex library",
+                        form: new LibraryMangaListForm(new MangaProvider()),
+                    }),
+                ]),
+            );
+        }
+
+        sections.push(this.createResetSection());
+
+        return sections;
+    }
+
+    private createMainSettingsSection(): Application.FormSectionElement {
+        return Section("mainSettings", [
+            NavigationRow("mangadex_settings", {
+                title: "MangaDex Website Settings",
+                form: this.createMangaDexSettingsForm(),
+            }),
+            NavigationRow("discover_settings", {
+                title: "Home Settings",
+                form: this.createDiscoverSettingsForm(),
+            }),
+            NavigationRow("content_settings", {
+                title: "Content Settings",
+                form: this.createDetailedContentSettingsForm(),
+            }),
+            NavigationRow("search_settings", {
+                title: "Search Settings",
+                form: this.createSearchSettingsForm(),
+            }),
+            NavigationRow("tracking_settings", {
+                title: "Tracking Settings",
+                form: this.createTrackingSettingsForm(),
+            }),
+            NavigationRow("update_filter_settings", {
+                title: "Update Settings",
+                form: this.createUpdateFilterSettingsForm(),
+            }),
+            NavigationRow("group_block_settings", {
+                title: "Scanlation Group Block Settings",
+                form: this.createGroupBlockForm(),
             }),
         ]);
     }
 
+    private createMangaDexSettingsForm(): Form {
+        return new WebsiteSettingsForm(
+            this.oAuthState,
+            () => this.createSessionInfoForm(),
+            () => this.createLoginButton(),
+            () => this.createWebsiteStatusForm(),
+        );
+    }
+
+    private createDiscoverSettingsForm(): Form {
+        return new DiscoverSettingsForm();
+    }
+
+    private createDetailedContentSettingsForm(): Form {
+        return new ContentSettingsForm();
+    }
+
+    private createUpdateFilterSettingsForm(): Form {
+        return new UpdateFilterSettingsForm();
+    }
+
+    private createSearchSettingsForm(): Form {
+        return new SearchSettingsForm();
+    }
+
+    private createTrackingSettingsForm(): Form {
+        return new TrackingSettingsForm();
+    }
+
+    private createGroupBlockForm(): Form {
+        return new GroupBlockForm(async (groups) => {
+            await this.blockedGroupsState.updateValue(groups);
+        });
+    }
+
+    private createWebsiteStatusForm(): Form {
+        return new WebsiteStatusForm();
+    }
+
     private createSessionInfoForm(): Form {
-        return new (class SessionInfoForm extends Form {
-            parentForm: MangaDexSettingsForm;
-            private sessionState: boolean;
-
-            constructor(private outerForm: MangaDexSettingsForm) {
-                super();
-                this.parentForm = outerForm;
-                this.sessionState = outerForm.oAuthState.value;
-            }
-
-            override getSections(): Application.FormSectionElement[] {
-                // Use the captured session state instead of direct access token check
-                if (!this.sessionState) {
-                    return [
-                        Section("session_status", [
-                            LabelRow("status", {
-                                title: "Status",
-                                value: "Successfully logged out",
-                            }),
-                        ]),
-                    ];
-                }
-
-                const accessToken = getAccessToken();
-                if (!accessToken) {
-                    return [
-                        Section("introspect", [
-                            LabelRow("logged_out", { title: "LOGGED OUT" }),
-                        ]),
-                    ];
-                }
-
-                return [
-                    Section(
-                        "introspect",
-                        Object.entries(accessToken.tokenBody).map(
-                            ([key, value]) =>
-                                LabelRow(key, {
-                                    title: key,
-                                    value: String(value),
-                                }),
-                        ),
-                    ),
-                    Section("account_actions", [
-                        ButtonRow("refresh_token_button", {
-                            title: "Refresh Token",
-                            onSelect: Application.Selector(
-                                this as SessionInfoForm,
-                                "handleRefreshToken",
-                            ),
-                        }),
-                        ButtonRow("logout", {
-                            title: "Logout",
-                            onSelect: Application.Selector(
-                                this as SessionInfoForm,
-                                "handleLogout",
-                            ),
-                        }),
-                    ]),
-                ];
-            }
-
-            async handleRefreshToken(): Promise<void> {
-                const response = await authEndpointRequest(
-                    "refresh",
-                    getAccessToken()?.refreshToken,
-                );
-                saveAccessToken(response.token.session, response.token.refresh);
-                await this.parentForm.oAuthState.updateValue(true);
-                this.sessionState = true;
-                this.reloadForm();
-            }
-
-            async handleLogout(): Promise<void> {
-                saveAccessToken(undefined, undefined);
-                await this.parentForm.oAuthState.updateValue(false);
-                this.sessionState = false;
-                this.reloadForm();
-            }
-        })(this);
+        return new SessionInfoForm(this.getOAuthState());
     }
 
     private createLoginButton(): Application.FormItemElement<unknown> {
@@ -337,101 +743,6 @@ export class MangaDexSettingsForm extends Form {
         });
     }
 
-    private createContentSettingsSection(): Application.FormSectionElement {
-        return Section("contentSettings", [
-            SelectRow("languages", {
-                title: "Languages",
-                value: this.languagesState.value,
-                minItemCount: 1,
-                maxItemCount: 100,
-                options: MDLanguages.getMDCodeList().map((x) => ({
-                    id: x,
-                    title: MDLanguages.getName(x),
-                })),
-                onValueChange: this.languagesState.selector,
-            }),
-
-            SelectRow("ratings", {
-                title: "Content Rating",
-                value: this.ratingsState.value,
-                minItemCount: 1,
-                maxItemCount: 4,
-                options: MDRatings.getEnumList().map((x) => ({
-                    id: x,
-                    title: MDRatings.getName(x),
-                })),
-                onValueChange: this.ratingsState.selector,
-            }),
-
-            ToggleRow("data_saver", {
-                title: "Data Saver",
-                value: this.dataSaverState.value,
-                onValueChange: this.dataSaverState.selector,
-            }),
-
-            ToggleRow("skip_same_chapter", {
-                title: "Skip Same Chapter",
-                value: this.skipSameChapterState.value,
-                onValueChange: this.skipSameChapterState.selector,
-            }),
-
-            ToggleRow("force_port", {
-                title: "Force Port 443",
-                value: this.forcePortState.value,
-                onValueChange: this.forcePortState.selector,
-            }),
-        ]);
-    }
-
-    private createThumbnailSettingsSection(): Application.FormSectionElement {
-        return Section("thumbnail_settings", [
-            SelectRow("homepage_thumbnail", {
-                title: "Homepage Thumbnail Quality",
-                value: [this.homepageThumbState.value],
-                minItemCount: 1,
-                maxItemCount: 1,
-                options: MDImageQuality.getEnumList().map((x) => ({
-                    id: x,
-                    title: MDImageQuality.getName(x),
-                })),
-                onValueChange: Application.Selector(
-                    this as MangaDexSettingsForm,
-                    "handleHomepageThumbChange",
-                ),
-            }),
-
-            SelectRow("search_thumbnail", {
-                title: "Search Thumbnail Quality",
-                value: [this.searchThumbState.value],
-                minItemCount: 1,
-                maxItemCount: 1,
-                options: MDImageQuality.getEnumList().map((x) => ({
-                    id: x,
-                    title: MDImageQuality.getName(x),
-                })),
-                onValueChange: Application.Selector(
-                    this as MangaDexSettingsForm,
-                    "handleSearchThumbChange",
-                ),
-            }),
-
-            SelectRow("manga_thumbnail", {
-                title: "Manga Thumbnail Quality",
-                value: [this.mangaThumbState.value],
-                minItemCount: 1,
-                maxItemCount: 1,
-                options: MDImageQuality.getEnumList().map((x) => ({
-                    id: x,
-                    title: MDImageQuality.getName(x),
-                })),
-                onValueChange: Application.Selector(
-                    this as MangaDexSettingsForm,
-                    "handleMangaThumbChange",
-                ),
-            }),
-        ]);
-    }
-
     private createResetSection(): Application.FormSectionElement {
         return Section("reset_section", [
             ButtonRow("reset_settings", {
@@ -444,8 +755,8 @@ export class MangaDexSettingsForm extends Form {
         ]);
     }
 
-    async handleHomepageThumbChange(value: string[]): Promise<void> {
-        await this.homepageThumbState.updateValue(value[0]);
+    async handleDiscoverThumbChange(value: string[]): Promise<void> {
+        await this.discoverThumbState.updateValue(value[0]);
     }
 
     async handleSearchThumbChange(value: string[]): Promise<void> {
@@ -466,14 +777,13 @@ export class MangaDexSettingsForm extends Form {
     }
 
     async handleResetSettings(): Promise<void> {
-        // Clear all settings through state instances
         await Promise.all([
             this.languagesState.updateValue(MDLanguages.getDefault()),
             this.ratingsState.updateValue(MDRatings.getDefault()),
             this.dataSaverState.updateValue(false),
             this.skipSameChapterState.updateValue(false),
-            this.homepageThumbState.updateValue(
-                MDImageQuality.getDefault("homepage"),
+            this.discoverThumbState.updateValue(
+                MDImageQuality.getDefault("discover"),
             ),
             this.searchThumbState.updateValue(
                 MDImageQuality.getDefault("search"),
@@ -482,36 +792,9 @@ export class MangaDexSettingsForm extends Form {
                 MDImageQuality.getDefault("manga"),
             ),
             this.forcePortState.updateValue(false),
+            this.blockedGroupsState.updateValue({}),
         ]);
 
-        // Trigger UI update
         await this.resetState.updateValue(!this.resetState.value);
-    }
-}
-
-class State<T> {
-    private _value: T;
-    public get value(): T {
-        return this._value;
-    }
-
-    public get selector(): SelectorID<(value: T) => Promise<void>> {
-        return Application.Selector(this as State<T>, "updateValue");
-    }
-
-    constructor(
-        private form: Form,
-        private persistKey: string,
-        value: T,
-    ) {
-        this._value = value;
-    }
-
-    public async updateValue(value: T): Promise<void> {
-        this._value = value;
-
-        Application.setState(value, this.persistKey);
-
-        this.form.reloadForm();
     }
 }
