@@ -489,7 +489,7 @@ export class MangaKatanaExtension implements MangaKatanaImplementation {
 
             return {
                 items: manga,
-                metadata: page,
+                metadata: nextPageMeta,
             };
         } catch (error) {
             console.error(`Error fetching search results: `, error);
