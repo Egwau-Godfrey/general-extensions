@@ -76,6 +76,7 @@ export function parseChapters(
     filter: ComicK.ChapterFilter,
 ): Chapter[] {
     const chaptersData = filterChapters(data.chapters, filter);
+    let sortingIndex = chaptersData.length;
 
     return chaptersData.map((chapter) => {
         const chapNum = Number(chapter.chap);
@@ -86,7 +87,8 @@ export function parseChapters(
             chapterId: chapter.hid,
             sourceManga,
             title: formatChapterTitle(chapter, filter.showTitle),
-            chapNum,
+            chapNum: !isNaN(chapNum) ? chapNum : 0,
+            sortingIndex: sortingIndex--,
             volume: filter.showVol && !isNaN(volume) ? volume : undefined,
             publishDate: new Date(chapter.created_at),
             version: groups.join(","),
@@ -247,12 +249,12 @@ export function parseComicTypeFilters() {
     ];
 }
 
-function parseContentRating(content_rating: string): ContentRating {
-    if (content_rating === "erotica") {
+function parseContentRating(contentRating: string): ContentRating {
+    if (contentRating === "erotica") {
         return ContentRating.ADULT;
     }
 
-    if (content_rating === "suggestive") {
+    if (contentRating === "suggestive") {
         return ContentRating.MATURE;
     }
 

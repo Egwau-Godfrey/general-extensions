@@ -1,6 +1,8 @@
 import { Form, Section, SelectRow, ToggleRow } from "@paperback/types";
 import { MDImageQuality, MDLanguages, MDRatings } from "../MangaDexHelper";
 import {
+    getCoverArtworkEnabled,
+    getCropImagesEnabled,
     getCustomCoversEnabled,
     getDataSaver,
     getDiscoverThumbnail,
@@ -27,10 +29,12 @@ export class ContentSettingsForm extends Form {
     private dataSaverState: State<boolean>;
     private skipSameChapterState: State<boolean>;
     private forcePortState: State<boolean>;
+    private coverArtworkState: State<boolean>;
     private customCoversState: State<boolean>;
     private discoverThumbState: State<string>;
     private searchThumbState: State<string>;
     private mangaThumbState: State<string>;
+    private cropImagesState: State<boolean>;
 
     constructor() {
         super();
@@ -55,6 +59,11 @@ export class ContentSettingsForm extends Form {
             "force_port_443",
             getForcePort443(),
         );
+        this.coverArtworkState = new State<boolean>(
+            this,
+            "cover_artwork_enabled",
+            getCoverArtworkEnabled(),
+        );
         this.customCoversState = new State<boolean>(
             this,
             "custom_covers_enabled",
@@ -74,6 +83,11 @@ export class ContentSettingsForm extends Form {
             this,
             "manga_thumbnail",
             getMangaThumbnail(),
+        );
+        this.cropImagesState = new State<boolean>(
+            this,
+            "crop_images_enabled",
+            getCropImagesEnabled(),
         );
     }
 
@@ -120,12 +134,26 @@ export class ContentSettingsForm extends Form {
                     value: this.forcePortState.value,
                     onValueChange: this.forcePortState.selector,
                 }),
+                ToggleRow("cover_artwork", {
+                    title: "Enable Cover Artwork in Manga Description",
+                    subtitle:
+                        "Show all available volume covers in manga details page",
+                    value: this.coverArtworkState.value,
+                    onValueChange: this.coverArtworkState.selector,
+                }),
                 ToggleRow("custom_covers", {
                     title: "Use User Selected Cover Artwork",
                     subtitle:
                         "Load and choose covers from the tracker (envelope icon)",
                     value: this.customCoversState.value,
                     onValueChange: this.customCoversState.selector,
+                }),
+                ToggleRow("crop_images", {
+                    title: "Enable Image Cropping",
+                    subtitle:
+                        "Automatically removes whitespace borders from images. Will noticeably increase loading time. Works best with Data Saver enabled.",
+                    value: this.cropImagesState.value,
+                    onValueChange: this.cropImagesState.selector,
                 }),
             ]),
             Section("thumbnail_settings", [
